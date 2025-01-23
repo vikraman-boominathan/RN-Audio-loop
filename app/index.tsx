@@ -10,6 +10,8 @@ export default function TimerWithMusic() {
   const [seconds, setSeconds] = useState("30");
   const [isRunning, setIsRunning] = useState(false);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [isStopwatch, setIsStopwatch] = useState(false);
+  const [stopwatchSeconds, setStopwatchSeconds] = useState(0);
 
   const hoursArray = Array.from({ length: 12 }, (_, i) => i.toString());
   console.log(hoursArray);
@@ -18,18 +20,25 @@ export default function TimerWithMusic() {
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
-    if (isRunning && totalSeconds > 0) {
-      interval = setInterval(() => {
-        setTotalSeconds((prev) => prev - 1);
-      }, 1000);
-    } else if (totalSeconds === 0) {
+    if (isRunning) {
+      if (isStopwatch) {
+        interval = setInterval(() => {
+          setStopwatchSeconds((prev) => prev + 1);
+        }, 1000);
+      } else if (totalSeconds > 0) {
+        interval = setInterval(() => {
+          setTotalSeconds((prev) => prev - 1);
+        }, 1000);
+      }
+    }
+    if (!isStopwatch && totalSeconds === 0) {
       setIsRunning(false);
       stopMusic();
     }
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isRunning, totalSeconds]);
+  }, [isRunning, totalSeconds, isStopwatch]);
 
   useEffect(() => {
     const initAudio = async () => {
@@ -57,32 +66,55 @@ export default function TimerWithMusic() {
     const hrs = Math.floor(totalSecs / 3600);
     const mins = Math.floor((totalSecs % 3600) / 60);
     const secs = totalSecs % 60;
-    return `${hrs.toString().padStart(2, "0")}:${mins
-      .toString()
-      .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+
+    if (isStopwatch) {
+      // For stopwatch: show HH:MM:SS only after 60 minutes
+      if (mins >= 60) {
+        return `${hrs.toString().padStart(2, "0")}:${mins
+          .toString()
+          .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+      } else {
+        return `${mins.toString().padStart(2, "0")}:${secs
+          .toString()
+          .padStart(2, "0")}`;
+      }
+    } else {
+      return `${hrs.toString().padStart(2, "0")}:${mins
+        .toString()
+        .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+    }
   };
 
   const startTimer = () => {
-    const totalSecs =
-      parseInt(hours, 10) * 3600 +
-      parseInt(minutes, 10) * 60 +
-      parseInt(seconds, 10);
-
-    if (totalSecs > 0) {
-      setTotalSeconds(totalSecs);
+    if (isStopwatch) {
       setIsRunning(true);
       playMusic();
     } else {
-      alert("Please set a time greater than 0");
+      const totalSecs =
+        parseInt(hours, 10) * 3600 +
+        parseInt(minutes, 10) * 60 +
+        parseInt(seconds, 10);
+
+      if (totalSecs > 0) {
+        setTotalSeconds(totalSecs);
+        setIsRunning(true);
+        playMusic();
+      } else {
+        alert("Please set a time greater than 0");
+      }
     }
   };
 
   const resetTimer = () => {
     setIsRunning(false);
-    setHours("0");
-    setMinutes("0");
-    setSeconds("30");
-    setTotalSeconds(30);
+    if (isStopwatch) {
+      setStopwatchSeconds(0);
+    } else {
+      setHours("0");
+      setMinutes("0");
+      setSeconds("30");
+      setTotalSeconds(30);
+    }
     stopMusic();
   };
 
@@ -116,11 +148,21 @@ export default function TimerWithMusic() {
 
   return (
     <View className="flex-1 justify-center items-center bg-gray-100">
+      <View className="mb-5">
+        <Button
+          title={isStopwatch ? "Switch to Timer" : "Switch to Stopwatch"}
+          onPress={() => {
+            setIsStopwatch(!isStopwatch);
+            resetTimer();
+          }}
+        />
+      </View>
+
       <Text className="text-5xl font-bold mb-5">
-        {formatTime(totalSeconds)}
+        {isStopwatch ? formatTime(stopwatchSeconds) : formatTime(totalSeconds)}
       </Text>
 
-      {!isRunning && (
+      {!isRunning && !isStopwatch && (
         <View className="flex-row justify-center items-center mb-5">
           <View className="items-center mx-2.5">
             <Text className="text-base mb-1">Hours</Text>
@@ -166,9 +208,15 @@ export default function TimerWithMusic() {
 
       <View className="mt-5">
         {!isRunning ? (
-          <Button title="Start Timer" onPress={startTimer} />
+          <Button
+            title={isStopwatch ? "Play loop" : "Start Timer"}
+            onPress={startTimer}
+          />
         ) : (
-          <Button title="Reset Timer" onPress={resetTimer} />
+          <Button
+            title={isStopwatch ? "Reset Infinite timer" : "Reset Timer"}
+            onPress={resetTimer}
+          />
         )}
       </View>
     </View>
